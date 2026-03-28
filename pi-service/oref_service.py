@@ -462,6 +462,23 @@ async def service_loop(ble):
         if len(seen_ids) > 500:
             seen_ids = set(list(seen_ids)[-200:])
 
+        # Pick up commands from web UI
+        cmd_path = os.path.join(BASE_DIR, "cmd_pending.json")
+        if os.path.exists(cmd_path):
+            try:
+                with open(cmd_path) as f:
+                    cmd = json.load(f)
+                os.remove(cmd_path)
+                action = cmd.get("action")
+                if action == "test_flash":
+                    asyncio.create_task(ble.test_flash())
+                elif action == "apply_idle":
+                    asyncio.create_task(ble.apply_idle())
+                elif action == "set_power":
+                    asyncio.create_task(ble.set_power(cmd.get("on", True)))
+            except Exception as e:
+                log.warning("Command error: %s", e)
+
         sd_watchdog()
         await asyncio.sleep(cfg["poll_interval"])
 
