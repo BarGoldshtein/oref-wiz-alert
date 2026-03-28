@@ -216,6 +216,14 @@ class BLEManager:
                                 await self._apply_idle_single(c, load_config())
                         except Exception as e:
                             log.warning("BLE connect failed %s: %s", addr, e)
+            # Write connection state for web UI to read
+            try:
+                state_path = os.path.join(BASE_DIR, "ble_state.json")
+                connected = [a for a, c in self.clients.items() if c.is_connected]
+                with open(state_path, "w") as f:
+                    json.dump({"connected": connected}, f)
+            except Exception:
+                pass
             await asyncio.sleep(15)
 
     async def _write_all(self, cmd):
