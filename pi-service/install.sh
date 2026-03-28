@@ -61,14 +61,44 @@ fi
 # ─── WiFi keepalive ───────────────────────────────────────────────────────────
 echo "[4/8] Setting up WiFi keepalive..."
 
+# Create dir first (missing on newer Pi OS)
+mkdir -p /etc/network/interfaces.d
 cat > /etc/network/interfaces.d/wlan0-nosleep << 'EOF'
 iface wlan0 inet manual
   wireless-power off
 EOF
 
-if ! grep -q "wireless-power off" /etc/rc.local 2>/dev/null; then
-  sed -i 's/^exit 0/iwconfig wlan0 power off 2>\/dev\/null || true\nexit 0/' /etc/rc.local
+# NetworkManager method (newer Pi OS)
+if command -v nmcli &>/dev/null; then
+  CONN=$(nmcli -t -f NAME con show --active 2>/dev/null | head -1)
+  if [ -n "$CONN" ]; then
+    nmcli con modify "$CONN" 802-11-wireless.powersave 2 2>/dev/null || true
+  fi
 fi
+
+# rc.local method (older Pi OS)
+if [ -f /etc/rc.local ]; then
+  if ! grep -q "wireless-power off" /etc/rc.local 2>/dev/null; then
+    sed -i 's/^exit 0/iwconfig wlan0 power off 2>\/dev\/null || true
+exit 0/' /etc/rc.local
+  fi
+fi
+
+# systemd service method (works on all versions)
+cat > /etc/systemd/system/wifi-powersave-off.service << 'EOF'
+[Unit]
+Description=Disable WiFi power saving
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/iwconfig wlan0 power off
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable wifi-powersave-off 2>/dev/null || true
 
 cat > /usr/local/bin/wifi-keepalive.sh << 'EOF'
 #!/bin/bash
