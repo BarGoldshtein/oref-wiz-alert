@@ -2,10 +2,9 @@
 """
 OrefAlert Web UI
 Flask app serving the configuration interface and REST API.
-Runs alongside oref_service.py as a separate systemd service.
+All bulb commands are sent via command files picked up by oref_service.py.
 """
 
-import asyncio
 import json
 import os
 import queue
@@ -14,26 +13,34 @@ import time
 
 from flask import Flask, Response, jsonify, render_template, request, stream_with_context
 from bleak import BleakScanner
+import asyncio
 
-# Import shared state from the service module
 import oref_service as svc
 
 app = Flask(__name__)
 
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+CMD_DIR     = "/opt/oref-alert"
 
-# SSE subscriber queues - each connected browser gets its own queue
+# ─── Command file helper ──────────────────────────────────────────────────────
+def send_command(cmd: dict):
+    """Write a command JSON file for the service to pick up."""
+    import tempfile
+    cmd_path = os.path.join(CMD_DIR, "cmd_pending.json")
+    tmp_path  = cmd_path + ".tmp"
+    with open(tmp_path, "w") as f:
+        json.dump(cmd, f)
+    os.replace(tmp_path, cmd_path)  # atomic write
+
+# ─── SSE log bridge ───────────────────────────────────────────────────────────
 _sse_subscribers: list[queue.Queue] = []
 _sse_lock = threading.Lock()
 
-# ─── Log buffer → SSE bridge ──────────────────────────────────────────────────
 class SSELogHandler:
-    """Watches log_buffer for new entries and pushes to SSE subscribers."""
     def __init__(self):
         self._last_len = 0
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
+        threading.Thread(target=self._run, daemon=True).start()
 
     def _run(self):
         while True:
@@ -57,35 +64,30 @@ class SSELogHandler:
 
 SSELogHandler()
 
-
-# ─── Helper ───────────────────────────────────────────────────────────────────
-def get_config() -> dict:
+# ─── Config helpers ───────────────────────────────────────────────────────────
+def get_config():
     return svc.load_config()
 
 def write_config(data: dict):
     cfg = get_config()
     cfg.update(data)
     svc.save_config(cfg)
-    svc.load_config()  # force immediate reload
+    svc.load_config()
     return cfg
-
 
 # ─── Pages ────────────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
     return render_template("index.html", config=get_config())
 
-
 # ─── API: config ──────────────────────────────────────────────────────────────
 @app.route("/api/config", methods=["GET"])
 def api_config_get():
     return jsonify(get_config())
 
-
 @app.route("/api/config", methods=["POST"])
 def api_config_post():
     data = request.json or {}
-    # Validate and sanitise key fields
     allowed = {
         "my_city", "all_country", "poll_interval",
         "ntfy_topic", "ntfy_server", "pattern_map",
@@ -95,10 +97,8 @@ def api_config_post():
     cfg = write_config(clean)
     return jsonify({"ok": True, "config": cfg})
 
-
 @app.route("/api/config/bulbs", methods=["POST"])
 def api_config_bulbs():
-    """Add, remove, or reorder BLE bulb addresses."""
     data = request.json or {}
     addresses = data.get("ble_addresses", [])
     if not isinstance(addresses, list):
@@ -106,11 +106,9 @@ def api_config_bulbs():
     cfg = write_config({"ble_addresses": addresses})
     return jsonify({"ok": True, "ble_addresses": cfg["ble_addresses"]})
 
-
 # ─── API: scan ────────────────────────────────────────────────────────────────
 @app.route("/api/scan/ble", methods=["POST"])
 def api_scan_ble():
-    """Scan for nearby BLE devices. Returns list of {address, name}."""
     result = {"devices": [], "error": None}
     try:
         loop = asyncio.new_event_loop()
@@ -123,7 +121,6 @@ def api_scan_ble():
     except Exception as e:
         result["error"] = str(e)
     return jsonify(result)
-
 
 # ─── API: BLE status ──────────────────────────────────────────────────────────
 @app.route("/api/ble/status", methods=["GET"])
@@ -142,23 +139,11 @@ def api_ble_status():
         "connected_count": svc.ble_manager.connected_count,
     })
 
-
 # ─── API: test flash ──────────────────────────────────────────────────────────
 @app.route("/api/test/flash", methods=["POST"])
 def api_test_flash():
-    data = request.json or {}
-    addr = data.get("address")  # optional - if None, tests all bulbs
-
-    async def _run():
-        await svc.ble_manager.test_flash(addr)
-
-    thread = threading.Thread(
-        target=lambda: asyncio.run(_run()),
-        daemon=True
-    )
-    thread.start()
+    send_command({"action": "test_flash"})
     return jsonify({"ok": True})
-
 
 # ─── API: test push ───────────────────────────────────────────────────────────
 @app.route("/api/test/push", methods=["POST"])
@@ -167,8 +152,7 @@ def api_test_push():
     svc.push_notify(cfg, title="בדיקת התרעה", message="זוהי בדיקה של מערכת ההתרעות", priority="default")
     return jsonify({"ok": True})
 
-
-# ─── API: service status ──────────────────────────────────────────────────────
+# ─── API: status ──────────────────────────────────────────────────────────────
 @app.route("/api/status", methods=["GET"])
 def api_status():
     return jsonify({
@@ -176,12 +160,10 @@ def api_status():
         "log_entries":     len(svc.log_buffer),
     })
 
-
-# ─── API: log history ────────────────────────────────────────────────────────
+# ─── API: log history ─────────────────────────────────────────────────────────
 @app.route("/api/log", methods=["GET"])
 def api_log():
     return jsonify(list(svc.log_buffer))
-
 
 # ─── SSE: live log stream ─────────────────────────────────────────────────────
 @app.route("/api/log/stream")
@@ -190,11 +172,9 @@ def api_log_stream():
     with _sse_lock:
         _sse_subscribers.append(q)
 
-    # Send existing buffer first
     def generate():
         for entry in list(svc.log_buffer):
             yield f"data: {json.dumps(entry)}\n\n"
-
         try:
             while True:
                 try:
@@ -212,22 +192,12 @@ def api_log_stream():
     return Response(
         stream_with_context(generate()),
         mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-
-
-# ─── Entry point ──────────────────────────────────────────────────────────────
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=80, debug=False, threaded=True)
-
 
 # ─── API: idle light control ──────────────────────────────────────────────────
 @app.route("/api/light/idle", methods=["POST"])
 def api_light_idle():
-    """Set idle color+brightness and apply immediately to bulbs."""
     data = request.json or {}
     idle = {
         "r":          max(0, min(255, int(data.get("r", 255)))),
@@ -237,35 +207,26 @@ def api_light_idle():
         "on":         bool(data.get("on", True)),
     }
     write_config({"idle": idle})
-
-    async def _apply():
-        await svc.ble_manager.apply_idle()
-    threading.Thread(target=lambda: asyncio.run(_apply()), daemon=True).start()
-
+    send_command({"action": "apply_idle"})
     return jsonify({"ok": True, "idle": idle})
-
 
 @app.route("/api/light/power", methods=["POST"])
 def api_light_power():
-    """Turn all bulbs on or off."""
     on = request.json.get("on", True)
     cfg = get_config()
     idle = cfg.get("idle", {})
     idle["on"] = bool(on)
     write_config({"idle": idle})
-
-    async def _apply():
-        await svc.ble_manager.set_power(on)
-    threading.Thread(target=lambda: asyncio.run(_apply()), daemon=True).start()
-
+    send_command({"action": "set_power", "on": bool(on)})
     return jsonify({"ok": True, "on": on})
-
 
 # ─── API: alert color overrides ───────────────────────────────────────────────
 @app.route("/api/alert/colors", methods=["POST"])
 def api_alert_colors():
-    """Save per-category alert color+brightness overrides."""
     data = request.json or {}
-    # data = { "1": {"r":255,"g":0,"b":0,"brightness":100}, ... }
     cfg = write_config({"alert_colors": data})
     return jsonify({"ok": True, "alert_colors": cfg.get("alert_colors", {})})
+
+# ─── Entry point ──────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=80, debug=False, threaded=True)
