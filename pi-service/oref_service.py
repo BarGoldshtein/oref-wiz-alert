@@ -52,7 +52,7 @@ log_buffer = deque(maxlen=200)
 class BufferHandler(logging.Handler):
     def emit(self, record):
         log_buffer.append({
-            "ts":    self.formatTime(record, "%H:%M:%S"),
+            "ts":    time.strftime("%H:%M:%S"),
             "level": record.levelname,
             "msg":   record.getMessage(),
         })
