@@ -127,16 +127,22 @@ def api_scan_ble():
 def api_ble_status():
     cfg = get_config()
     addresses = cfg.get("ble_addresses", [])
-    status = []
-    for addr in addresses:
-        client = svc.ble_manager.clients.get(addr)
-        status.append({
-            "address":   addr,
-            "connected": client.is_connected if client else False,
-        })
+    # Read connection state written by the service process
+    state_path = os.path.join(CMD_DIR, "ble_state.json")
+    connected_set = set()
+    try:
+        with open(state_path) as f:
+            state = json.load(f)
+        connected_set = set(state.get("connected", []))
+    except Exception:
+        pass
+    status = [
+        {"address": addr, "connected": addr in connected_set}
+        for addr in addresses
+    ]
     return jsonify({
         "bulbs":           status,
-        "connected_count": svc.ble_manager.connected_count,
+        "connected_count": len(connected_set),
     })
 
 # ─── API: test flash ──────────────────────────────────────────────────────────
