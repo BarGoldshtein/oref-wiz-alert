@@ -1,0 +1,34 @@
+[Unit]
+Description=Oref Alert Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=oref
+WorkingDirectory=/opt/oref-alert
+
+# RAM-based log dir (never touches SD card)
+RuntimeDirectory=oref-alert
+LogsDirectory=oref-alert
+LogsDirectoryMode=0755
+
+ExecStart=/opt/oref-alert/venv/bin/python oref_service.py
+
+Restart=always
+RestartSec=3
+
+# systemd watchdog — if service doesn't ping in 30s, kill and restart
+WatchdogSec=30
+NotifyAccess=main
+
+# Logging to journal only (no SD writes)
+StandardOutput=journal
+StandardError=journal
+
+# Memory limit — safety net against leaks
+MemoryMax=80M
+MemorySwapMax=0
+
+[Install]
+WantedBy=multi-user.target

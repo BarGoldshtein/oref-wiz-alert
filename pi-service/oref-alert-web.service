@@ -1,0 +1,19 @@
+[Unit]
+Description=Oref Alert Web UI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/oref-alert
+ExecStart=/opt/oref-alert/venv/bin/python web_app.py
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+MemoryMax=60M
+MemorySwapMax=0
+
+[Install]
+WantedBy=multi-user.target
