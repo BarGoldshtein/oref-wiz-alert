@@ -435,9 +435,9 @@ async function loadConfig() {
   const res = await fetch("/api/config");
   configCache = await res.json();
   renderPatternGrid();
-}
   renderAlertColorGrid();
   loadIdleFromConfig();
+}
 
 function markDirty() {
   dirty = true;
