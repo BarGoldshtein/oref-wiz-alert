@@ -85,14 +85,16 @@ OREF_HEADERS    = {
 ALERT_DEFAULTS = {
     "1":   {"r": 255, "g": 0,   "b": 0,   "brightness": 100, "name": "ירי רקטות וטילים"},
     "2":   {"r": 255, "g": 0,   "b": 0,   "brightness": 100, "name": "ירי לא מזוהה"},
-    "3":   {"r": 255, "g": 140, "b": 0,   "brightness": 100, "name": "חדירת כלי טיס עוין"},
+    "3":   {"r": 0,   "g": 255, "b": 100, "brightness": 80,  "name": "חומרים רדיואקטיביים"},
     "4":   {"r": 0,   "g": 220, "b": 0,   "brightness": 100, "name": "חדירת מחבלים"},
     "5":   {"r": 128, "g": 0,   "b": 255, "brightness": 80,  "name": "רעידת אדמה"},
-    "6":   {"r": 0,   "g": 255, "b": 100, "brightness": 80,  "name": "חומרים רדיואקטיביים"},
+    "6":   {"r": 255, "g": 140, "b": 0,   "brightness": 100, "name": "חדירת כלי טיס עוין"},
     "7":   {"r": 255, "g": 255, "b": 0,   "brightness": 80,  "name": "אירוע כימי"},
     "8":   {"r": 0,   "g": 100, "b": 255, "brightness": 80,  "name": "צונאמי"},
     "13":  {"r": 255, "g": 0,   "b": 0,   "brightness": 100, "name": "פיגוע"},
-    "101": {"r": 0,   "g": 200, "b": 255, "brightness": 50,  "name": "תרגיל"},
+    "101":      {"r": 0,   "g": 200, "b": 255, "brightness": 50,  "name": "תרגיל"},
+    "pre_alert": {"r": 255, "g": 200, "b": 0,   "brightness": 60,  "name": "התרעה מקדימה"},
+    "all_clear":  {"r": 0,   "g": 255, "b": 80,  "brightness": 60,  "name": "האירוע הסתיים"},
 }
 
 FLASH_PATTERNS = {
@@ -105,14 +107,32 @@ FLASH_PATTERNS = {
 DEFAULT_PATTERN_MAP = {
     "1":   "fast_strobe",
     "2":   "fast_strobe",
-    "3":   "medium_strobe",
-    "4":   "medium_strobe",
-    "5":   "slow_pulse",
-    "6":   "slow_pulse",
+    "3":   "slow_pulse",    # radioactive
+    "4":   "medium_strobe",  # infiltration
+    "5":   "slow_pulse",     # earthquake
+    "6":   "medium_strobe",  # hostile aircraft
     "7":   "slow_pulse",
     "8":   "slow_pulse",
     "13":  "fast_strobe",
-    "101": "solid",
+    "101":      "solid",
+    "pre_alert": "slow_pulse",
+    "all_clear":  "slow_pulse",
+}
+
+# Default flash duration per category (seconds)
+DEFAULT_DURATIONS = {
+    "1":   60,   # rockets — 60s
+    "2":   60,   # unidentified fire — 60s
+    "3":   45,   # hostile aircraft — 45s
+    "4":   45,   # infiltration — 45s
+    "5":   30,   # earthquake — 30s
+    "6":   30,   # radioactive — 30s
+    "7":   30,   # chemical — 30s
+    "8":   30,   # tsunami — 30s
+    "13":  60,   # terror attack — 60s
+    "101":      15,   # drill — 15s
+    "pre_alert": 20,  # pre-alert — 20s
+    "all_clear":  10,  # all clear — 10s
 }
 
 # ─── BLE ──────────────────────────────────────────────────────────────────────
@@ -137,13 +157,13 @@ DEFAULT_CONFIG = {
     "my_city":        "",
     "all_country":    False,
     "poll_interval":  0.5,
-    "alert_duration": 3600,
     "ntfy_topic":     "",
     "ntfy_server":    "https://ntfy.sh",
     "pattern_map":    DEFAULT_PATTERN_MAP.copy(),
     "enabled_cats":   list(ALERT_DEFAULTS.keys()),
     "idle":           DEFAULT_IDLE.copy(),
     "alert_colors":   {},
+    "alert_durations": {},   # per-cat override e.g. {"1": 60, "101": 10}
 }
 
 _config_mtime = 0.0
@@ -179,6 +199,14 @@ def get_alert_color(cfg, cat):
     base = ALERT_DEFAULTS.get(cat, {"r": 255, "g": 50, "b": 0, "brightness": 100, "name": "התרעה"})
     override = cfg.get("alert_colors", {}).get(cat, {})
     return {**base, **override}
+
+def get_alert_duration(cfg, cat):
+    """Return duration in seconds for this category.
+    Priority: user per-cat override > DEFAULT_DURATIONS > 45s fallback."""
+    per_cat = cfg.get("alert_durations", {}).get(cat)
+    if per_cat is not None:
+        return int(per_cat)
+    return DEFAULT_DURATIONS.get(cat, 45)
 
 
 # ─── BLE Connection Manager ───────────────────────────────────────────────────
@@ -422,11 +450,17 @@ async def service_loop(ble):
                 continue
 
             if cat == "10":
-                log.info("All clear | %s", ", ".join(cities))
                 seen_ids.add(alert_id)
-                if alert_active:
-                    alert_end_time = time.time() + 10
-                continue
+                # Cat 10 is reused — distinguish by title text
+                if "ניתן לצאת" in title_str or "הסתיים" in title_str:
+                    log.info("All clear | %s", ", ".join(cities))
+                    cat = "all_clear"  # treat as flashable category below
+                elif "בדקות הקרובות" in title_str or "צפויות" in title_str or "לשפר את המיקום" in desc:
+                    log.info("Pre-alert | %s", ", ".join(cities[:3]))
+                    cat = "pre_alert"  # treat as flashable category below
+                else:
+                    log.info("Cat 10 msg | %s", title_str)
+                    continue
 
             seen_ids.add(alert_id)
 
@@ -460,7 +494,7 @@ async def service_loop(ble):
             )
 
             alert_active   = True
-            alert_end_time = time.time() + cfg.get("alert_duration", 3600)
+            alert_end_time = time.time() + get_alert_duration(cfg, cat)
 
         if alert_active and time.time() > alert_end_time:
             log.info("Alert expired - restoring idle")
@@ -480,6 +514,15 @@ async def service_loop(ble):
                 action = cmd.get("action")
                 if action == "test_flash":
                     asyncio.create_task(ble.test_flash())
+                elif action == "test_category":
+                    async def _test_cat(c=cmd):
+                        await ble.flash(
+                            c.get("r", 255), c.get("g", 0), c.get("b", 0),
+                            c.get("brightness", 100), c.get("pattern", "medium_strobe")
+                        )
+                        await asyncio.sleep(c.get("duration", 10))
+                        await ble.stop_alert()
+                    asyncio.create_task(_test_cat())
                 elif action == "apply_idle":
                     asyncio.create_task(ble.apply_idle())
                 elif action == "set_power":
