@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="he" dir="rtl" id="root">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -274,20 +274,25 @@
 <header>
   <div id="status-dot"></div>
   <h1>OrefAlert</h1>
-  <span id="status-text">טוען...</span>
+  <span id="status-text" data-state="">טוען...</span>
+  <select id="lang-select" onchange="setLang(this.value)"
+    style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer">
+    <option value="he">עברית</option>
+    <option value="ru">Русский</option>
+  </select>
 </header>
 
 <main>
 
   <!-- ─── Bulbs ─────────────────────────────────────────────────────────── -->
   <div class="card">
-    <div class="card-header">נורות Bluetooth</div>
+    <div class="card-header" id="card-bulbs">נורות Bluetooth</div>
     <div class="card-body">
       <div id="bulb-list"></div>
 
       <div class="row">
         <button class="btn btn-ghost" id="btn-scan" onclick="scanBLE()">סרוק נורות</button>
-        <button class="btn btn-ghost" onclick="testFlash()">בדיקת הבהוב</button>
+        <button class="btn btn-ghost" id="btn-test-flash" onclick="testFlash()">בדיקת הבהוב</button>
       </div>
 
       <div id="scan-spinner" style="display:none; color:var(--muted); font-size:13px;">סורק... (10 שניות)</div>
@@ -297,7 +302,7 @@
 
   <!-- ─── City ──────────────────────────────────────────────────────────── -->
   <div class="card">
-    <div class="card-header">עיר ואזור</div>
+    <div class="card-header" id="card-city">עיר ואזור</div>
     <div class="card-body">
       <label>
         עיר
@@ -305,7 +310,7 @@
         <datalist id="city-list"></datalist>
       </label>
       <div class="toggle-row">
-        <label>כל הארץ (ביטול סינון עיר)</label>
+        <label id="label-all-country">כל הארץ (ביטול סינון עיר)</label>
         <label class="switch">
           <input type="checkbox" id="all-country" {% if config.all_country %}checked{% endif %} onchange="markDirty()">
           <span class="slider"></span>
@@ -317,44 +322,44 @@
 
   <!-- ─── Push ──────────────────────────────────────────────────────────── -->
   <div class="card">
-    <div class="card-header">התרעות Push</div>
+    <div class="card-header" id="card-push">התרעות Push</div>
     <div class="card-body">
-      <label>
+      <label id="label-ntfy">
         ntfy.sh topic
-        <span>צור topic חינמי בלי הרשמה — הכנס שם ייחודי</span>
+        <span id="span-ntfy-desc">צור topic חינמי בלי הרשמה — הכנס שם ייחודי</span>
         <div class="row">
           <input type="text" id="ntfy-topic" placeholder="למשל: oref-alert-mybuildingname" value="{{ config.ntfy_topic }}">
-          <button class="btn btn-ghost" onclick="testPush()">בדוק</button>
+          <button class="btn btn-ghost" id="btn-test-push" onclick="testPush()">בדוק</button>
         </div>
       </label>
-      <p class="section-note">התקן את אפליקציית ntfy.sh ועקוב אחר ה-topic שהגדרת. ההתרעה תגיע לכל מכשיר שמנוי ל-topic.</p>
+      <p class="section-note" id="span-ntfy-note">התקן את אפליקציית ntfy.sh ועקוב אחר ה-topic שהגדרת. ההתרעה תגיע לכל מכשיר שמנוי ל-topic.</p>
     </div>
   </div>
 
 
   <!-- ─── Idle light control ────────────────────────────────────────── -->
   <div class="card">
-    <div class="card-header">שליטה בנורה — מצב רגיל</div>
+    <div class="card-header" id="card-idle">שליטה בנורה — מצב רגיל</div>
     <div class="card-body">
       <div class="toggle-row">
-        <label>נורה דולקת</label>
+        <label id="label-bulb-on">נורה דולקת</label>
         <label class="switch"><input type="checkbox" id="idle-on" checked onchange="setIdlePower(this.checked)"><span class="slider"></span></label>
       </div>
       <label>צבע<input type="color" id="idle-color" value="#ffc878" style="width:100%;height:40px;border:1px solid var(--border);border-radius:7px;background:var(--bg);cursor:pointer;padding:2px 4px" oninput="previewIdle()"></label>
       <label>עוצמה: <span id="idle-bv">15%</span><input type="range" id="idle-brightness" min="1" max="100" value="15" oninput="document.getElementById('idle-bv').textContent=this.value+'%'; previewIdle()"></label>
-      <button class="btn btn-primary" onclick="saveIdle()">החל על הנורה</button>
+      <button class="btn btn-primary" id="btn-apply-idle" onclick="saveIdle()">החל על הנורה</button>
     </div>
   </div>
 
   <!-- ─── Alert colors ────────────────────────────────────────── -->
   <div class="card">
-    <div class="card-header">צבע ועוצמה לפי סוג התרעה</div>
-    <div class="card-body"><div id="alert-color-grid"></div><button class="btn btn-primary" style="margin-top:8px" onclick="saveAlertColors()">שמור צבעי התרעה</button></div>
+    <div class="card-header" id="card-alert-colors">צבע ועוצמה לפי סוג התרעה</div>
+    <div class="card-body"><div id="alert-color-grid"></div><button class="btn btn-primary" style="margin-top:8px" id="btn-save-colors" onclick="saveAlertColors()">שמור צבעי התרעה</button></div>
   </div>
 
   <!-- ─── Flash patterns ────────────────────────────────────────────────── -->
   <div class="card">
-    <div class="card-header">תבניות הבהוב</div>
+    <div class="card-header" id="card-patterns">תבניות הבהוב</div>
     <div class="card-body">
       <div class="pattern-grid" id="pattern-grid"></div>
     </div>
@@ -362,12 +367,12 @@
 
   <!-- ─── Log ───────────────────────────────────────────────────────────── -->
   <div class="card">
-    <div class="card-header">יומן חי</div>
+    <div class="card-header" id="card-log">יומן חי</div>
     <div class="card-body" style="gap:10px">
       <div id="log-container"></div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-ghost" style="font-size:12px" onclick="document.getElementById('log-container').innerHTML=''">נקה</button>
-        <button class="btn btn-ghost" style="font-size:12px" onclick="downloadLog()">הורד יומן</button>
+        <button class="btn btn-ghost" style="font-size:12px" id="btn-clear-log" onclick="document.getElementById('log-container').innerHTML=''">נקה</button>
+        <button class="btn btn-ghost" style="font-size:12px" id="btn-download-log" onclick="downloadLog()">הורד יומן</button>
       </div>
     </div>
   </div>
@@ -376,8 +381,8 @@
 
 <!-- Save bar -->
 <div id="save-bar">
-  <span>יש שינויים שלא נשמרו</span>
-  <button class="btn btn-success" onclick="saveConfig()">שמור</button>
+  <span id="save-bar-text">יש שינויים שלא נשמרו</span>
+  <button class="btn btn-success" id="btn-save" onclick="saveConfig()">שמור</button>
 </div>
 
 <!-- City datalist populated from JS -->
@@ -428,6 +433,8 @@ async function init() {
   setInterval(refreshBulbStatus, 10000);
   document.getElementById("city-input").addEventListener("input", markDirty);
   document.getElementById("ntfy-topic").addEventListener("input", markDirty);
+  document.getElementById("lang-select").value = currentLang;
+  setLang(currentLang);
 }
 
 function populateCityList() {
@@ -464,10 +471,12 @@ async function refreshBulbStatus() {
     const txt = document.getElementById("status-text");
     if (data.connected_count > 0) {
       dot.className = "ok";
-      txt.textContent = `${data.connected_count} נורה מחוברת`;
+      txt.dataset.state = "ok";
+      txt.textContent = `${data.connected_count} ${t("bulbConnected")}`;
     } else {
       dot.className = "";
-      txt.textContent = "אין נורות מחוברות";
+      txt.dataset.state = "";
+      txt.textContent = t("noBulbsConnected");
     }
     renderBulbList();
   } catch(e) {}
@@ -477,7 +486,7 @@ function renderBulbList() {
   const addresses = configCache.ble_addresses || [];
   const container = document.getElementById("bulb-list");
   if (addresses.length === 0) {
-    container.innerHTML = '<p style="color:var(--muted);font-size:13px;">אין נורות מוגדרות. סרוק כדי להוסיף.</p>';
+    container.innerHTML = `<p style="color:var(--muted);font-size:13px;">${t('noBulbs')}</p>`;
     return;
   }
   container.innerHTML = addresses.map((addr, i) => `
@@ -485,7 +494,7 @@ function renderBulbList() {
       <div class="bulb-dot ${bulbStatus[addr] ? 'connected' : ''}"></div>
       <div class="bulb-info">
         <div class="bulb-addr">${addr}</div>
-        <div class="bulb-name">${bulbStatus[addr] ? 'מחובר' : 'לא מחובר'}</div>
+        <div class="bulb-name">${bulbStatus[addr] ? t('connected') : t('notConnected')}</div>
       </div>
       <button class="bulb-remove" onclick="removeBulb('${addr}')" title="הסר">×</button>
     </div>
@@ -778,6 +787,147 @@ async function saveAlertColors() {
     body: JSON.stringify({alert_durations: durations}),
   });
   configCache.alert_durations = durations;
+}
+
+// ─── Translations ─────────────────────────────────────────────────────────────
+const T = {
+  he: {
+    title:           "OrefAlert",
+    loading:         "טוען...",
+    bulbs:           "נורות Bluetooth",
+    scan:            "סרוק נורות",
+    testFlash:       "בדיקת הבהוב",
+    scanning:        "סורק... (10 שניות)",
+    noBulbs:         "אין נורות מוגדרות. סרוק כדי להוסיף.",
+    connected:       "מחובר",
+    notConnected:    "לא מחובר",
+    cityArea:        "עיר ואזור",
+    city:            "עיר",
+    cityPlaceholder: "הקלד שם עיר...",
+    allCountry:      "כל הארץ (ביטול סינון עיר)",
+    push:            "התרעות Push",
+    ntfyTopic:       "ntfy.sh topic",
+    ntfyDesc:        "צור topic חינמי בלי הרשמה — הכנס שם ייחודי",
+    ntfyPlaceholder: "למשל: oref-alert-mybuildingname",
+    ntfyNote:        "התקן את אפליקציית ntfy.sh ועקוב אחר ה-topic שהגדרת.",
+    testBtn:         "בדוק",
+    idleControl:     "שליטה בנורה — מצב רגיל",
+    bulbOn:          "נורה דולקת",
+    color:           "צבע",
+    brightness:      "עוצמה",
+    applyIdle:       "החל על הנורה",
+    alertColors:     "צבע ועוצמה לפי סוג התרעה",
+    saveColors:      "שמור צבעי התרעה",
+    patterns:        "תבניות הבהוב",
+    log:             "יומן חי",
+    clearLog:        "נקה",
+    downloadLog:     "הורד יומן",
+    unsaved:         "יש שינויים שלא נשמרו",
+    save:            "שמור",
+    seconds:         "שנ'",
+    test:            "בדוק",
+    noDevices:       "לא נמצאו מכשירים",
+    networkError:    "שגיאת רשת",
+    noBulbsConnected:"אין נורות מחוברות",
+    bulbConnected:   "נורה מחוברת",
+  },
+  ru: {
+    title:           "OrefAlert",
+    loading:         "Загрузка...",
+    bulbs:           "Bluetooth лампы",
+    scan:            "Сканировать",
+    testFlash:       "Тест вспышки",
+    scanning:        "Сканирование... (10 сек)",
+    noBulbs:         "Нет ламп. Нажмите сканировать.",
+    connected:       "Подключено",
+    notConnected:    "Не подключено",
+    cityArea:        "Город и район",
+    city:            "Город",
+    cityPlaceholder: "Введите город...",
+    allCountry:      "Вся страна (без фильтра)",
+    push:            "Push уведомления",
+    ntfyTopic:       "ntfy.sh topic",
+    ntfyDesc:        "Создайте бесплатный topic — введите уникальное имя",
+    ntfyPlaceholder: "Например: oref-alert-mybuilding",
+    ntfyNote:        "Установите приложение ntfy.sh и подпишитесь на topic.",
+    testBtn:         "Тест",
+    idleControl:     "Управление лампой — режим ожидания",
+    bulbOn:          "Лампа включена",
+    color:           "Цвет",
+    brightness:      "Яркость",
+    applyIdle:       "Применить к лампе",
+    alertColors:     "Цвет и яркость по типу тревоги",
+    saveColors:      "Сохранить цвета",
+    patterns:        "Паттерны мигания",
+    log:             "Живой журнал",
+    clearLog:        "Очистить",
+    downloadLog:     "Скачать журнал",
+    unsaved:         "Есть несохранённые изменения",
+    save:            "Сохранить",
+    seconds:         "сек",
+    test:            "Тест",
+    noDevices:       "Устройства не найдены",
+    networkError:    "Ошибка сети",
+    noBulbsConnected:"Нет подключённых ламп",
+    bulbConnected:   "лампа подключена",
+  }
+};
+
+let currentLang = localStorage.getItem("lang") || "he";
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem("lang", lang);
+  const root = document.getElementById("root");
+  root.lang = lang;
+  root.dir = lang === "he" ? "rtl" : "ltr";
+  document.getElementById("lang-select").value = lang;
+  applyTranslations();
+  renderBulbList();
+  renderPatternGrid();
+  renderAlertColorGrid();
+}
+
+function t(key) {
+  return (T[currentLang] || T.he)[key] || key;
+}
+
+function applyTranslations() {
+  const map = {
+    "card-bulbs":        "bulbs",
+    "btn-scan":          "scan",
+    "btn-test-flash":    "testFlash",
+    "scan-spinner":      "scanning",
+    "card-city":         "cityArea",
+    "label-city":        "city",
+    "label-all-country": "allCountry",
+    "card-push":         "push",
+    "label-ntfy":        "ntfyTopic",
+    "span-ntfy-desc":    "ntfyDesc",
+    "btn-test-push":     "testBtn",
+    "span-ntfy-note":    "ntfyNote",
+    "card-idle":         "idleControl",
+    "label-bulb-on":     "bulbOn",
+    "label-color":       "color",
+    "btn-apply-idle":    "applyIdle",
+    "card-alert-colors": "alertColors",
+    "btn-save-colors":   "saveColors",
+    "card-patterns":     "patterns",
+    "card-log":          "log",
+    "btn-clear-log":     "clearLog",
+    "btn-download-log":  "downloadLog",
+    "save-bar-text":     "unsaved",
+    "btn-save":          "save",
+  };
+  Object.entries(map).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = t(key);
+  });
+  document.getElementById("city-input").placeholder = t("cityPlaceholder");
+  document.getElementById("ntfy-topic").placeholder = t("ntfyPlaceholder");
+  document.getElementById("status-text").textContent =
+    document.getElementById("status-text").dataset.state === "ok"
+      ? `1 ${t("bulbConnected")}` : t("noBulbsConnected");
 }
 
 function downloadLog() {
