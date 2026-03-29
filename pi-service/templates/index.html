@@ -305,7 +305,7 @@
     <div class="card-header" id="card-city">עיר ואזור</div>
     <div class="card-body">
       <label>
-        עיר
+        <span id="label-city">עיר</span>
         <input type="text" id="city-input" list="city-list" placeholder="הקלד שם עיר..." value="{{ config.my_city }}">
         <datalist id="city-list"></datalist>
       </label>
@@ -346,7 +346,7 @@
         <label class="switch"><input type="checkbox" id="idle-on" checked onchange="setIdlePower(this.checked)"><span class="slider"></span></label>
       </div>
       <label><span id="label-color">צבע</span><input type="color" id="idle-color" value="#ffc878" style="width:100%;height:40px;border:1px solid var(--border);border-radius:7px;background:var(--bg);cursor:pointer;padding:2px 4px" oninput="previewIdle()"></label>
-      <label>עוצמה: <span id="idle-bv">15%</span><input type="range" id="idle-brightness" min="1" max="100" value="15" oninput="document.getElementById('idle-bv').textContent=this.value+'%'; previewIdle()"></label>
+      <label><span id="label-brightness">עוצמה</span>: <span id="idle-bv">15%</span><input type="range" id="idle-brightness" min="1" max="100" value="15" oninput="document.getElementById('idle-bv').textContent=this.value+'%'; previewIdle()"></label>
       <button class="btn btn-primary" id="btn-apply-idle" onclick="saveIdle()">החל על הנורה</button>
     </div>
   </div>
@@ -936,6 +936,8 @@ function applyTranslations() {
     "label-color":       "color",
     "btn-apply-idle":    "applyIdle",
     "label-color":       "labelColor",
+    "label-city":        "city",
+    "label-brightness":  "brightness",
     "card-alert-colors": "alertColors",
     "btn-save-colors":   "saveColors",
     "card-patterns":     "patterns",
