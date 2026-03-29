@@ -365,7 +365,10 @@
     <div class="card-header">יומן חי</div>
     <div class="card-body" style="gap:10px">
       <div id="log-container"></div>
-      <button class="btn btn-ghost" style="font-size:12px" onclick="document.getElementById('log-container').innerHTML=''">נקה</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" style="font-size:12px" onclick="document.getElementById('log-container').innerHTML=''">נקה</button>
+        <button class="btn btn-ghost" style="font-size:12px" onclick="downloadLog()">הורד יומן</button>
+      </div>
     </div>
   </div>
 
@@ -395,6 +398,11 @@ const ALERT_CATS = [
   { cat: "pre_alert", name: "התרעה מקדימה", color: "#eab308" },
   { cat: "all_clear",  name: "האירוע הסתיים",  color: "#22c55e" },
 ];
+
+const DEFAULT_DURATIONS = {
+  "1": 60, "2": 60, "3": 45, "4": 45, "5": 30, "6": 30,
+  "7": 30, "8": 30, "13": 60, "101": 15, "pre_alert": 20, "all_clear": 10
+};
 
 const PATTERNS = ["fast_strobe", "medium_strobe", "slow_pulse", "solid"];
 const PATTERN_LABELS = {
@@ -721,7 +729,7 @@ function renderAlertColorGrid() {
     const def    = overrides[cat.cat] || {};
     const hexVal = def.r !== undefined ? rgbToHex(def.r,def.g,def.b) : cat.color;
     const bVal   = def.brightness !== undefined ? def.brightness : 100;
-    const dVal   = durations[cat.cat] !== undefined ? durations[cat.cat] : defaultDur;
+    const dVal   = durations[cat.cat] !== undefined ? durations[cat.cat] : (DEFAULT_DURATIONS[cat.cat] || 45);
     return `
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
         <div style="width:10px;height:10px;border-radius:50%;background:${cat.color};flex-shrink:0"></div>
@@ -749,14 +757,13 @@ function renderAlertColorGrid() {
 async function saveAlertColors() {
   const colors    = {};
   const durations = {};
-  const defaultDur = configCache.alert_duration || 45;
   ALERT_CATS.forEach(cat => {
     const hex = document.getElementById(`ac-color-${cat.cat}`).value;
     const {r,g,b} = hexToRgb(hex);
     const brightness = parseInt(document.getElementById(`ac-bright-${cat.cat}`).value);
     const dur = parseInt(document.getElementById(`ac-dur-${cat.cat}`).value);
     colors[cat.cat] = {r,g,b,brightness};
-    if (dur !== defaultDur) durations[cat.cat] = dur;
+    durations[cat.cat] = dur;
   });
   const res = await fetch("/api/alert/colors", {
     method: "POST",
@@ -771,6 +778,13 @@ async function saveAlertColors() {
     body: JSON.stringify({alert_durations: durations}),
   });
   configCache.alert_durations = durations;
+}
+
+function downloadLog() {
+  const a = document.createElement("a");
+  a.href = "/api/log/download";
+  a.download = "oref-alert-" + new Date().toISOString().slice(0,19).replace(/:/g,"-") + ".log";
+  a.click();
 }
 
 init();
