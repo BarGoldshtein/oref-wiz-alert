@@ -91,7 +91,7 @@ def api_config_post():
     allowed = {
         "my_city", "all_country", "poll_interval",
         "ntfy_topic", "ntfy_server", "pattern_map",
-        "enabled_cats", "alert_duration",
+        "enabled_cats", "alert_duration", "alert_durations",
     }
     clean = {k: v for k, v in data.items() if k in allowed}
     cfg = write_config(clean)
@@ -152,6 +152,20 @@ def api_test_flash():
     return jsonify({"ok": True})
 
 # ─── API: test push ───────────────────────────────────────────────────────────
+@app.route("/api/test/category", methods=["POST"])
+def api_test_category():
+    data = request.json or {}
+    send_command({
+        "action":     "test_category",
+        "r":          int(data.get("r", 255)),
+        "g":          int(data.get("g", 0)),
+        "b":          int(data.get("b", 0)),
+        "brightness": int(data.get("brightness", 100)),
+        "pattern":    data.get("pattern", "medium_strobe"),
+        "duration":   int(data.get("duration", 10)),
+    })
+    return jsonify({"ok": True})
+
 @app.route("/api/test/push", methods=["POST"])
 def api_test_push():
     cfg = get_config()
