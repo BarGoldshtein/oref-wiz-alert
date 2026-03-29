@@ -311,6 +311,7 @@
           <span class="slider"></span>
         </label>
       </div>
+
     </div>
   </div>
 
@@ -383,14 +384,16 @@ const CITIES = ["אבו גוש","אבו סנאן","אופקים","אור יהו�
 const ALERT_CATS = [
   { cat: "1",   name: "ירי רקטות",       color: "#ef4444" },
   { cat: "2",   name: "ירי לא מזוהה",    color: "#ef4444" },
-  { cat: "3",   name: "חדירת כלי טיס",   color: "#f97316" },
+  { cat: "3",   name: "חומרים רדיואקטיביים", color: "#10b981" },
   { cat: "4",   name: "חדירת מחבלים",    color: "#22c55e" },
   { cat: "5",   name: "רעידת אדמה",      color: "#a855f7" },
-  { cat: "6",   name: "חומרים רדיואקטיביים", color: "#10b981" },
+  { cat: "6",   name: "חדירת כלי טיס",   color: "#f97316" },
   { cat: "7",   name: "אירוע כימי",      color: "#eab308" },
   { cat: "8",   name: "צונאמי",          color: "#3b82f6" },
   { cat: "13",  name: "פיגוע",           color: "#ef4444" },
   { cat: "101", name: "תרגיל",           color: "#06b6d4" },
+  { cat: "pre_alert", name: "התרעה מקדימה", color: "#eab308" },
+  { cat: "all_clear",  name: "האירוע הסתיים",  color: "#22c55e" },
 ];
 
 const PATTERNS = ["fast_strobe", "medium_strobe", "slow_pulse", "solid"];
@@ -579,8 +582,30 @@ function renderPatternGrid() {
         onchange="markDirty()" id="pattern-${cat.cat}">
         ${PATTERNS.map(p => `<option value="${p}" ${(patternMap[cat.cat]||'medium_strobe')===p?'selected':''}>${PATTERN_LABELS[p]}</option>`).join("")}
       </select>
+      <button onclick="testCategory('${cat.cat}')"
+        style="background:var(--border);border:none;color:var(--text);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap">בדוק</button>
     </div>
   `).join("");
+}
+
+// ─── Test category ────────────────────────────────────────────────────────────
+async function testCategory(cat) {
+  const colorEl  = document.getElementById(`ac-color-${cat}`);
+  const brightEl = document.getElementById(`ac-bright-${cat}`);
+  const patternEl = document.getElementById(`pattern-${cat}`);
+  const durEl    = document.getElementById(`ac-dur-${cat}`);
+
+  const hex = colorEl ? colorEl.value : "#ff0000";
+  const {r,g,b} = hexToRgb(hex);
+  const brightness = brightEl ? parseInt(brightEl.value) : 100;
+  const pattern = patternEl ? patternEl.value : "medium_strobe";
+  const duration = durEl ? parseInt(durEl.value) : 10;
+
+  await fetch("/api/test/category", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({r, g, b, brightness, pattern, duration}),
+  });
 }
 
 // ─── Save ─────────────────────────────────────────────────────────────────────
@@ -592,10 +617,10 @@ async function saveConfig() {
   });
 
   const payload = {
-    my_city:     document.getElementById("city-input").value.trim(),
-    all_country: document.getElementById("all-country").checked,
-    ntfy_topic:  document.getElementById("ntfy-topic").value.trim(),
-    pattern_map: patternMap,
+    my_city:        document.getElementById("city-input").value.trim(),
+    all_country:    document.getElementById("all-country").checked,
+    ntfy_topic:     document.getElementById("ntfy-topic").value.trim(),
+    pattern_map:    patternMap,
   };
 
   const res = await fetch("/api/config", {
@@ -688,21 +713,29 @@ async function setIdlePower(on) {
 
 // ─── Alert color editor ────────────────────────────────────────────────────
 function renderAlertColorGrid() {
-  const overrides = configCache.alert_colors || {};
+  const overrides  = configCache.alert_colors    || {};
+  const durations  = configCache.alert_durations || {};
+  const defaultDur = configCache.alert_duration  || 45;
   const grid = document.getElementById("alert-color-grid");
   grid.innerHTML = ALERT_CATS.map(cat => {
-    const def = overrides[cat.cat] || {};
+    const def    = overrides[cat.cat] || {};
     const hexVal = def.r !== undefined ? rgbToHex(def.r,def.g,def.b) : cat.color;
-    const bVal = def.brightness !== undefined ? def.brightness : 100;
+    const bVal   = def.brightness !== undefined ? def.brightness : 100;
+    const dVal   = durations[cat.cat] !== undefined ? durations[cat.cat] : defaultDur;
     return `
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
         <div style="width:10px;height:10px;border-radius:50%;background:${cat.color};flex-shrink:0"></div>
-        <span style="flex:1;font-size:13px">${cat.name}</span>
+        <span style="flex:1;font-size:13px;min-width:120px">${cat.name}</span>
         <input type="color" id="ac-color-${cat.cat}" value="${hexVal}"
-          style="width:40px;height:32px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;padding:1px 2px">
+          style="width:36px;height:32px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;padding:1px 2px">
         <input type="range" id="ac-bright-${cat.cat}" min="1" max="100" value="${bVal}"
-          style="width:80px" title="עוצמה">
-        <span id="ac-bv-${cat.cat}" style="font-size:11px;color:var(--muted);width:32px">${bVal}%</span>
+          style="width:70px" title="עוצמה">
+        <span id="ac-bv-${cat.cat}" style="font-size:11px;color:var(--muted);width:28px">${bVal}%</span>
+        <input type="number" id="ac-dur-${cat.cat}" value="${dVal}" min="5" max="3600"
+          style="width:52px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 6px;font-size:12px" title="משך (שניות)">
+        <span style="font-size:11px;color:var(--muted)">שנ'</span>
+        <button onclick="testCategory('${cat.cat}')"
+          style="background:var(--border);border:none;color:var(--text);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">בדוק</button>
       </div>`;
   }).join("");
   ALERT_CATS.forEach(cat => {
@@ -714,12 +747,16 @@ function renderAlertColorGrid() {
 }
 
 async function saveAlertColors() {
-  const colors = {};
+  const colors    = {};
+  const durations = {};
+  const defaultDur = configCache.alert_duration || 45;
   ALERT_CATS.forEach(cat => {
     const hex = document.getElementById(`ac-color-${cat.cat}`).value;
     const {r,g,b} = hexToRgb(hex);
     const brightness = parseInt(document.getElementById(`ac-bright-${cat.cat}`).value);
+    const dur = parseInt(document.getElementById(`ac-dur-${cat.cat}`).value);
     colors[cat.cat] = {r,g,b,brightness};
+    if (dur !== defaultDur) durations[cat.cat] = dur;
   });
   const res = await fetch("/api/alert/colors", {
     method: "POST",
@@ -728,6 +765,12 @@ async function saveAlertColors() {
   });
   const data = await res.json();
   if (data.ok) configCache.alert_colors = data.alert_colors;
+  await fetch("/api/config", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({alert_durations: durations}),
+  });
+  configCache.alert_durations = durations;
 }
 
 init();
