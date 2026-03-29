@@ -345,7 +345,7 @@
         <label id="label-bulb-on">נורה דולקת</label>
         <label class="switch"><input type="checkbox" id="idle-on" checked onchange="setIdlePower(this.checked)"><span class="slider"></span></label>
       </div>
-      <label>צבע<input type="color" id="idle-color" value="#ffc878" style="width:100%;height:40px;border:1px solid var(--border);border-radius:7px;background:var(--bg);cursor:pointer;padding:2px 4px" oninput="previewIdle()"></label>
+      <label id="label-color">${t('color')}<input type="color" id="idle-color" value="#ffc878" style="width:100%;height:40px;border:1px solid var(--border);border-radius:7px;background:var(--bg);cursor:pointer;padding:2px 4px" oninput="previewIdle()"></label>
       <label>עוצמה: <span id="idle-bv">15%</span><input type="range" id="idle-brightness" min="1" max="100" value="15" oninput="document.getElementById('idle-bv').textContent=this.value+'%'; previewIdle()"></label>
       <button class="btn btn-primary" id="btn-apply-idle" onclick="saveIdle()">החל על הנורה</button>
     </div>
@@ -410,12 +410,9 @@ const DEFAULT_DURATIONS = {
 };
 
 const PATTERNS = ["fast_strobe", "medium_strobe", "slow_pulse", "solid"];
-const PATTERN_LABELS = {
-  fast_strobe:    "סטרוב מהיר (רקטות)",
-  medium_strobe:  "סטרוב בינוני",
-  slow_pulse:     "פולס איטי",
-  solid:          "צבע קבוע",
-};
+function getPatternLabel(p) {
+  return ((T[currentLang] || T.he).patternLabels || {})[p] || p;
+}
 
 let dirty = false;
 let configCache = {};
@@ -551,7 +548,7 @@ async function scanBLE() {
       results.innerHTML = `<p style="color:var(--red);font-size:13px;">שגיאה: ${data.error}</p>`;
       results.style.display = "flex";
     } else if (data.devices.length === 0) {
-      results.innerHTML = `<p style="color:var(--muted);font-size:13px;">לא נמצאו מכשירים</p>`;
+      results.innerHTML = `<p style="color:var(--muted);font-size:13px;">${t('noDevices')}</p>`;
       results.style.display = "flex";
     } else {
       results.style.display = "flex";
@@ -570,7 +567,7 @@ async function scanBLE() {
     }
   } catch(e) {
     spinner.style.display = "none";
-    results.innerHTML = `<p style="color:var(--red);font-size:13px;">שגיאת רשת</p>`;
+    results.innerHTML = `<p style="color:var(--red);font-size:13px;">${t('networkError')}</p>`;
     results.style.display = "flex";
   }
   btn.disabled = false;
@@ -593,14 +590,14 @@ function renderPatternGrid() {
     <div class="pattern-row">
       <div class="pattern-label">
         <div class="cat-dot" style="background:${cat.color}"></div>
-        <span style="font-size:13px">${cat.name}</span>
+        <span style="font-size:13px">${(T[currentLang]||T.he).catNames[cat.cat]||cat.name}</span>
       </div>
       <select class="pattern-select btn-ghost" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 10px;font-size:13px;"
         onchange="markDirty()" id="pattern-${cat.cat}">
-        ${PATTERNS.map(p => `<option value="${p}" ${(patternMap[cat.cat]||'medium_strobe')===p?'selected':''}>${PATTERN_LABELS[p]}</option>`).join("")}
+        ${PATTERNS.map(p => `<option value="${p}" ${(patternMap[cat.cat]||'medium_strobe')===p?'selected':''}>${getPatternLabel(p)}</option>`).join("")}
       </select>
       <button onclick="testCategory('${cat.cat}')"
-        style="background:var(--border);border:none;color:var(--text);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap">בדוק</button>
+        style="background:var(--border);border:none;color:var(--text);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap">${t('test')}</button>
     </div>
   `).join("");
 }
@@ -742,7 +739,7 @@ function renderAlertColorGrid() {
     return `
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
         <div style="width:10px;height:10px;border-radius:50%;background:${cat.color};flex-shrink:0"></div>
-        <span style="flex:1;font-size:13px;min-width:120px">${cat.name}</span>
+        <span style="flex:1;font-size:13px;min-width:120px">${(T[currentLang]||T.he).catNames[cat.cat]||cat.name}</span>
         <input type="color" id="ac-color-${cat.cat}" value="${hexVal}"
           style="width:36px;height:32px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;padding:1px 2px">
         <input type="range" id="ac-bright-${cat.cat}" min="1" max="100" value="${bVal}"
@@ -750,9 +747,9 @@ function renderAlertColorGrid() {
         <span id="ac-bv-${cat.cat}" style="font-size:11px;color:var(--muted);width:28px">${bVal}%</span>
         <input type="number" id="ac-dur-${cat.cat}" value="${dVal}" min="5" max="3600"
           style="width:52px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 6px;font-size:12px" title="משך (שניות)">
-        <span style="font-size:11px;color:var(--muted)">שנ'</span>
+        <span style="font-size:11px;color:var(--muted)">${t('seconds')}</span>
         <button onclick="testCategory('${cat.cat}')"
-          style="background:var(--border);border:none;color:var(--text);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">בדוק</button>
+          style="background:var(--border);border:none;color:var(--text);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">${t('test')}</button>
       </div>`;
   }).join("");
   ALERT_CATS.forEach(cat => {
@@ -793,6 +790,20 @@ async function saveAlertColors() {
 const T = {
   he: {
     title:           "OrefAlert",
+    catNames: {
+      "1": "ירי רקטות וטילים", "2": "ירי לא מזוהה",
+      "3": "חומרים רדיואקטיביים", "4": "חדירת מחבלים",
+      "5": "רעידת אדמה", "6": "חדירת כלי טיס עוין",
+      "7": "אירוע כימי", "8": "צונאמי", "13": "פיגוע",
+      "101": "תרגיל", "pre_alert": "התרעה מקדימה", "all_clear": "האירוע הסתיים"
+    },
+    labelColor:      "צבע",
+    labelBrightness: "עוצמה",
+    labelDuration:   "משך",
+    patternLabels: {
+      fast_strobe: "סטרוב מהיר", medium_strobe: "סטרוב בינוני",
+      slow_pulse: "פולס איטי", solid: "צבע קבוע"
+    },
     loading:         "טוען...",
     bulbs:           "נורות Bluetooth",
     scan:            "סרוק נורות",
@@ -833,6 +844,20 @@ const T = {
   },
   ru: {
     title:           "OrefAlert",
+    catNames: {
+      "1": "Ракетный обстрел", "2": "Неопознанный обстрел",
+      "3": "Радиоактивные материалы", "4": "Проникновение террористов",
+      "5": "Землетрясение", "6": "Враждебный летательный аппарат",
+      "7": "Химический инцидент", "8": "Цунами", "13": "Теракт",
+      "101": "Учения", "pre_alert": "Предупреждение", "all_clear": "Отбой тревоги"
+    },
+    labelColor:      "Цвет",
+    labelBrightness: "Яркость",
+    labelDuration:   "Длительность",
+    patternLabels: {
+      fast_strobe: "Быстрая вспышка", medium_strobe: "Средняя вспышка",
+      slow_pulse: "Медленный пульс", solid: "Постоянный цвет"
+    },
     loading:         "Загрузка...",
     bulbs:           "Bluetooth лампы",
     scan:            "Сканировать",
