@@ -324,8 +324,8 @@
   <div class="card">
     <div class="card-header" id="card-push">התרעות Push</div>
     <div class="card-body">
-      <label id="label-ntfy">
-        ntfy.sh topic
+      <label>
+        <span id="label-ntfy">ntfy.sh topic</span>
         <span id="span-ntfy-desc">צור topic חינמי בלי הרשמה — הכנס שם ייחודי</span>
         <div class="row">
           <input type="text" id="ntfy-topic" placeholder="למשל: oref-alert-mybuildingname" value="{{ config.ntfy_topic }}">
@@ -342,7 +342,7 @@
     <div class="card-header" id="card-idle">שליטה בנורה — מצב רגיל</div>
     <div class="card-body">
       <div class="toggle-row">
-        <label id="label-bulb-on">נורה דולקת</label>
+        <label><span id="label-bulb-on">נורה דולקת</span></label>
         <label class="switch"><input type="checkbox" id="idle-on" checked onchange="setIdlePower(this.checked)"><span class="slider"></span></label>
       </div>
       <label><span id="label-color">צבע</span><input type="color" id="idle-color" value="#ffc878" style="width:100%;height:40px;border:1px solid var(--border);border-radius:7px;background:var(--bg);cursor:pointer;padding:2px 4px" oninput="previewIdle()"></label>
