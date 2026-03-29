@@ -185,6 +185,36 @@ def api_status():
 def api_log():
     return jsonify(list(svc.log_buffer))
 
+@app.route("/api/log/download", methods=["GET"])
+def api_log_download():
+    import subprocess
+    lines = []
+
+    # Part 1: systemd journal for both services
+    try:
+        result = subprocess.run(
+            ["journalctl", "-u", "oref-alert.service", "-u", "oref-alert-web.service",
+             "--no-pager", "--since", "today", "-o", "short"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.stdout:
+            lines.append("=== SYSTEMD JOURNAL ===")
+            lines.append(result.stdout)
+    except Exception as e:
+        lines.append(f"Journal error: {e}")
+
+    # Part 2: in-memory buffer
+    lines.append("=== IN-MEMORY LOG BUFFER ===")
+    for entry in svc.log_buffer:
+        lines.append(f"[{entry['ts']}] {entry['level']} {entry['msg']}")
+
+    content = "\n".join(lines)
+    return Response(
+        content,
+        mimetype="text/plain",
+        headers={"Content-Disposition": "attachment; filename=oref-alert.log"}
+    )
+
 # ─── SSE: live log stream ─────────────────────────────────────────────────────
 @app.route("/api/log/stream")
 def api_log_stream():
