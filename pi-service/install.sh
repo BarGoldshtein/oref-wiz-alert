@@ -142,7 +142,7 @@ if [ ! -f $APP_DIR/config.json ]; then
   "my_city": "",
   "all_country": false,
   "poll_interval": 0.5,
-  "alert_duration": 3600,
+  "alert_duration": 45,
   "ntfy_topic": "",
   "ntfy_server": "https://ntfy.sh",
   "pattern_map": {
@@ -179,7 +179,7 @@ echo "============================================"
 echo " OrefAlert installed!"
 echo "============================================"
 echo ""
-echo " Open http://oref-alert.local in your browser"
+echo " Open http://{user}.local in your browser"
 echo ""
 echo " IMPORTANT: reboot to activate watchdog + RAM logging"
 echo " Run: sudo reboot"
