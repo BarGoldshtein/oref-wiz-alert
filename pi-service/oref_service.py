@@ -131,7 +131,7 @@ DEFAULT_DURATIONS = {
     "8":   30,   # tsunami — 30s
     "13":  60,   # terror attack — 60s
     "101":      15,   # drill — 15s
-    "pre_alert": 20,  # pre-alert — 20s
+    "pre_alert": 240, # pre-alert — 4 minutes
     "all_clear":  10,  # all clear — 10s
 }
 
@@ -479,11 +479,15 @@ async def service_loop(ble):
             log.info("ALERT | %s | %s | %s", color["name"], cities_str, desc)
 
             if ble.connected_count > 0:
-                await ble.flash(
-                    color["r"], color["g"], color["b"],
-                    color.get("brightness", 100),
-                    pattern,
-                )
+                # Don't restart flash for repeated pre-alert waves — only start
+                # if no alert is active, or if a real alert overrides a pre-alert
+                is_real_alert = cat not in ("pre_alert", "all_clear")
+                if not alert_active or is_real_alert:
+                    await ble.flash(
+                        color["r"], color["g"], color["b"],
+                        color.get("brightness", 100),
+                        pattern,
+                    )
             else:
                 log.warning("No BLE bulbs connected")
 
@@ -493,8 +497,11 @@ async def service_loop(ble):
                 message="{}\n{}".format(cities_str, desc) if desc else cities_str,
             )
 
-            alert_active   = True
-            alert_end_time = time.time() + get_alert_duration(cfg, cat)
+            alert_active = True
+            # Extend timer if new wave lasts longer than current end time
+            new_end = time.time() + get_alert_duration(cfg, cat)
+            if new_end > alert_end_time:
+                alert_end_time = new_end
 
         if alert_active and time.time() > alert_end_time:
             log.info("Alert expired - restoring idle")
